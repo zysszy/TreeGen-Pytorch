@@ -419,7 +419,6 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
         return beams
         #return beams
 def test():
-    pre()
     dev_set = SumDataset(args, "test")
     print(len(dev_set))
     args.Nl_Vocsize = len(dev_set.Nl_Voc)
