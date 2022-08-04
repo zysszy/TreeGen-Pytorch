@@ -155,7 +155,7 @@ def train():
                     maxC = tnum
                     maxAcc = acc
                     print("find better acc " + str(maxAcc))
-                    save_model(model.module, 'checkModel%s/'%args.seed)
+                    save_model(model.module, 'checkpointSearch/')
                 if maxC2 < tnum2 or maxC2 == tnum2 and maxAcc2 < acc2:
                     maxC2 = tnum2
                     maxAcc2 = acc2
@@ -222,10 +222,13 @@ class SearchNode:
                 rule = ds.rrdict[x].strip().lower().split()
                 inputruleparent.append(ds.Get_Em([rule[0]], ds.Code_Voc)[0])
                 inputrulechild.append(ds.pad_seq(ds.Get_Em(rule[2:], ds.Code_Voc), ds.Char_Len))
+        tmp = [ds.pad_seq(ds.Get_Em(['start'], ds.Code_Voc), 10)] + self.everTreepath        
         inputrule = ds.pad_seq(self.state, ds.Code_Len)
-        inputrulechild = ds.pad_list(inputrulechild, ds.Code_Len, ds.Char_Len)
+        inputrulechild = ds.pad_list(tmp, ds.Code_Len, 10)
+        #inputrulechild = ds.pad_list(inputrulechild, ds.Code_Len, ds.Char_Len)
         inputruleparent = ds.pad_seq(ds.Get_Em(self.inputparent, ds.Code_Voc), ds.Code_Len)
-        inputdepth = ds.pad_seq(self.depth, ds.Code_Len)
+        inputdepth = ds.pad_list(self.depth, ds.Code_Len, 40)
+        #inputdepth = ds.pad_seq(self.depth, ds.Code_Len)
         return inputrule, inputrulechild, inputruleparent, inputdepth
     def getTreePath(self, ds):
         tmppath = [self.expanded.name.lower()]
@@ -269,7 +272,10 @@ class SearchNode:
         self.parent[args.NlLen + len(self.depth), args.NlLen + self.expanded.fatherlistID] = 1
         if rule >= len(self.ruledict):
             self.parent[args.NlLen + len(self.depth), rule - len(self.ruledict)] = 1
-        self.state.append(rule)
+        if rule >= len(self.ruledict):
+            self.state.append(len(self.ruledict) - 1)
+        else:
+            self.state.append(rule)
         self.inputparent.append(self.expanded.name.lower())
         self.depth.append(self.expanded.depth)
         if self.expanded.name != "list":
@@ -292,6 +298,11 @@ class SearchNode:
 beamss = []
 def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
     args.batch_size = len(inputnl[0])
+    rulead = gVar(pickle.load(open("rulead.pkl", "rb"))).float().unsqueeze(0).repeat(2, 1, 1)
+    a, b = getRulePkl(vds)
+    tmpf = gVar(a).unsqueeze(0).repeat(2, 1).long()
+    tmpc = gVar(b).unsqueeze(0).repeat(2, 1, 1).long()
+    tmpindex = gVar(np.arange(len(vds.ruledict))).unsqueeze(0).repeat(2, 1).long()
     with torch.no_grad():
         beams = {}
         for i in range(batch_size):
@@ -320,7 +331,7 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                     if p >= len(beams[i]):
                         continue
                     x = beams[i][p]
-                    #print(x.getTreestr())
+                    print(x.getTreestr())
                     x.selectExpandedNode()
                     if x.expanded == None or len(x.state) >= args.CodeLen:
                         ansV.setdefault(i, []).append(x)
@@ -354,7 +365,8 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                 assert(np.array_equal(inputnl[6][0][:index + 1], tmpAd[0][:index + 1]))
                 assert(np.array_equal(inputnl[7][0][:index + 1], tmptreepath[0][:index + 1]))
                 assert(np.array_equal(inputnl[8][0][:index + 1], tmpdepth[0][:index + 1]))'''
-                result = model(gVar(inputnl[0][validnum]), gVar(inputnl[1][validnum]), gVar(tmprule), gVar(tmpruleparent), gVar(tmprulechild), gVar(tmpAd), gVar(tmptreepath), gVar(tmpdepth), antimasks, None, "test")
+                #result = model(gVar(inputnl[0][validnum]), gVar(inputnl[1][validnum]), gVar(tmprule), gVar(tmpruleparent), gVar(tmprulechild), gVar(tmpAd), gVar(tmptreepath), gVar(tmpdepth), antimasks, None, "test")
+                result = model(gVar(inputnl[0][validnum]), gVar(inputnl[1][validnum]), gVar(tmprule), gVar(tmpruleparent), gVar(tmprulechild), gVar(tmpAd), gVar(tmptreepath), None, tmpf, tmpc, tmpindex, rulead, antimasks, None, "test")
                 results = result.data.cpu().numpy()
                 #print(result, inputCode)
                 currIndex = 0
@@ -419,19 +431,20 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
         return beams
         #return beams
 def test():
+    #pre()
     dev_set = SumDataset(args, "test")
     print(len(dev_set))
     args.Nl_Vocsize = len(dev_set.Nl_Voc)
     args.Code_Vocsize = len(dev_set.Code_Voc)
     args.Vocsize = len(dev_set.Char_Voc)
     args.rulenum = len(dev_set.ruledict) + args.NlLen
-    args.batch_size = 66
+    args.batch_size = 22
     rdic = {}
     for x in dev_set.Nl_Voc:
         rdic[dev_set.Nl_Voc[x]] = x
     #print(dev_set.Nl_Voc)
     model = Decoder(args)
-    if torch.cuda.is_available():
+    if use_cuda:
         print('using GPU')
         #os.environ["CUDA_VISIBLE_DEVICES"] = "3"
         model = model.cuda()
@@ -447,7 +460,7 @@ def test():
             continue'''
         ans = BeamSearch((x[0], x[1], x[5], x[2], x[3], x[4], x[6], x[7], x[8]), dev_set, model, 15, args.batch_size, index)
         index += 1
-        for i in range(args.batch_size):
+        for i in range(1):
             beam = ans[i]
             #print(beam[0].parent, beam[0].everTreepath, beam[0].state)
             f.write(beam.getTreestr())
@@ -455,7 +468,7 @@ def test():
         #exit(0)
         #f.write(" ".join(ans.ans[1:-1]))
         #f.write("\n")
-        #f.flush()#print(ans)
+        f.flush()#print(ans)
 if __name__ == "__main__":
     if sys.argv[1] == "train":
         train()
