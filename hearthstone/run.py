@@ -412,7 +412,7 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                 else:
                     beam.append(beams[i][p])
                 nls.append(vds.nl[args.batch_size * k + i])
-            finetune(beam, k, nls, args.batch_size)
+            #finetune(beam, k, nls, args.batch_size)
         for i in range(len(beams)):
             beamss.append(deepcopy(beams[i]))
             
