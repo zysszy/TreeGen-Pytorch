@@ -8,7 +8,7 @@ python3 run.py train
 
 ### To predict the code 
 ```
-python3 run.py test 1
+python3 run.py test
 ```
 
-where ```1``` is the beam size, and the output is available at ```outval.txt```.
+where the output is available at ```outval.txt```.
