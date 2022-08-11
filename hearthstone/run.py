@@ -155,7 +155,7 @@ def train():
                     maxC = tnum
                     maxAcc = acc
                     print("find better acc " + str(maxAcc))
-                    save_model(model.module, 'checkModel%s/'%args.seed)
+                    save_model(model.module, 'checkpointSearch/')
                 if maxC2 < tnum2 or maxC2 == tnum2 and maxAcc2 < acc2:
                     maxC2 = tnum2
                     maxAcc2 = acc2
