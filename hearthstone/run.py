@@ -155,7 +155,7 @@ def train():
                     maxC = tnum
                     maxAcc = acc
                     print("find better acc " + str(maxAcc))
-                    save_model(model.module, 'checkpointSearch/')
+                    save_model(model.module, 'checkModel%s/'%args.seed)
                 if maxC2 < tnum2 or maxC2 == tnum2 and maxAcc2 < acc2:
                     maxC2 = tnum2
                     maxAcc2 = acc2
@@ -199,14 +199,14 @@ class SearchNode:
             self.expandedname.append(x.strip().split()[0])
         self.everTreepath = []
     def selcetNode(self, root):
-        if not root.expanded and root.name in self.expandedname and root.name != "list" and self.state[root.fatherlistID] < len(self.ruledict):
+        if not root.expanded and root.name in self.expandedname and root.name != "body" and self.state[root.fatherlistID] < len(self.ruledict):
             return root
         else:
             for x in root.child:
                 ans = self.selcetNode(x)
                 if ans:
                     return ans
-            if root.name == "list" and root.expanded == False:
+            if root.name == "body" and root.expanded == False:
                 return root
         return None
     def selectExpandedNode(self):
@@ -278,7 +278,7 @@ class SearchNode:
             self.state.append(rule)
         self.inputparent.append(self.expanded.name.lower())
         self.depth.append(self.expanded.depth)
-        if self.expanded.name != "list":
+        if self.expanded.name != "body":
             self.expanded.expanded = True
         return True
     def printTree(self, r):
@@ -331,7 +331,7 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                     if p >= len(beams[i]):
                         continue
                     x = beams[i][p]
-                    print(x.getTreestr())
+                    #print(x.getTreestr())
                     x.selectExpandedNode()
                     if x.expanded == None or len(x.state) >= args.CodeLen:
                         ansV.setdefault(i, []).append(x)
@@ -403,7 +403,7 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                             tmpbeam[j].append(x)
                     beams[j] = sorted(tmpbeam[j], key=lambda x: x.prob, reverse=True)[:beamsize]
             index += 1
-        for p in range(beamsize):
+        '''for p in range(beamsize):
             beam = []
             nls = []
             for i in range(len(beams)):
@@ -411,10 +411,10 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                     beam.append(beams[i][len(beams[i]) - 1])
                 else:
                     beam.append(beams[i][p])
-                nls.append(vds.nl[args.batch_size * k + i])
+                nls.append(vds.nl[args.batch_size * k + i])'''
             #finetune(beam, k, nls, args.batch_size)
-        for i in range(len(beams)):
-            beamss.append(deepcopy(beams[i]))
+        #for i in range(len(beams)):
+        #    beamss.append(deepcopy(beams[i]))
             
 
         for i in range(len(beams)):
@@ -427,7 +427,7 @@ def BeamSearch(inputnl, vds, model, beamsize, batch_size, k):
                     mans = y.prob
                     tmpans = y
             beams[i] = tmpans
-        open("beams.pkl", "wb").write(pickle.dumps(beamss))
+        #open("beams.pkl", "wb").write(pickle.dumps(beamss))
         return beams
         #return beams
 def test():
@@ -460,15 +460,16 @@ def test():
             continue'''
         ans = BeamSearch((x[0], x[1], x[5], x[2], x[3], x[4], x[6], x[7], x[8]), dev_set, model, 15, args.batch_size, index)
         index += 1
-        for i in range(1):
+        for i in range(args.batch_size):
             beam = ans[i]
             #print(beam[0].parent, beam[0].everTreepath, beam[0].state)
             f.write(beam.getTreestr())
             f.write("\n")
+            f.flush()
         #exit(0)
         #f.write(" ".join(ans.ans[1:-1]))
         #f.write("\n")
-        f.flush()#print(ans)
+        #f.flush()#print(ans)
 if __name__ == "__main__":
     if sys.argv[1] == "train":
         train()
